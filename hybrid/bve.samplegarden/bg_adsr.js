@@ -43,6 +43,17 @@ function level(t, tRel) {
   return k >= 1 ? 0 : l0 * (1 - k);
 }
 function stageAt(t, tRel) { return t > tRel ? 3 : (t < P.a ? 0 : (t < P.a + P.d ? 1 : 2)); }
+// the joints of the envelope: start, attack peak, end of decay, start of release, end of release
+function jointsFor(tRel) {
+  var raw = [{ t: 0, l: 0, stage: 0 }];
+  if (P.a <= tRel) raw.push({ t: P.a, l: 1, stage: 0 });
+  if (P.a + P.d <= tRel) raw.push({ t: P.a + P.d, l: P.s, stage: 1 });
+  raw.push({ t: tRel, l: ads(tRel), stage: 2 });
+  raw.push({ t: tRel + P.r, l: 0, stage: 3 });
+  var pts = [], i;
+  for (i = 0; i < raw.length; i++) if (!pts.length || Math.abs(raw[i].t - pts[pts.length - 1].t) > 0.5) pts.push(raw[i]);   // drop duplicates
+  return pts;
+}
 var tk = new Task(function () { mgraphics.redraw(); }, this);
 tk.interval = 40; tk.repeat();
 function notifydeleted() { tk.cancel(); tk.freepeer(); }
@@ -78,6 +89,13 @@ function paint() {
     mg.move_to(X(t1), Y(level(t1, tRel))); mg.line_to(X(t2), Y(level(t2, tRel)));
     mg.set_source_rgba(c[0], c[1], c[2], active ? 0.5 : 1); mg.stroke();
   }
+  // joint points on the blue envelope
+  var J = jointsFor(tRel);
+  for (i = 0; i < J.length; i++) {
+    c = shade(J[i].stage);
+    mg.ellipse(X(J[i].t) - 3.5, Y(J[i].l) - 3.5, 7, 7); mg.set_source_rgba(0.09, 0.1, 0.12, 1); mg.fill();               // dark ring so the dot stands out
+    mg.ellipse(X(J[i].t) - 2.5, Y(J[i].l) - 2.5, 5, 5); mg.set_source_rgba(c[0], c[1], c[2], active ? 0.75 : 1); mg.fill();
+  }
   // one line per sounding voice (height = velocity), bright where the voice already is, dot at its playhead
   for (j = 0; j < voices.length; j++) {
     var v = voices[j], tr = (v.tOff >= 0) ? Math.min(v.tOff, tRel) : tRel, el = tn - v.t0, tot = tr + P.r, cur = Math.min(el, tot);
@@ -89,6 +107,12 @@ function paint() {
     mg.move_to(X(0), Y(0));
     for (i = 1; i <= steps; i++) { t = cur * i / steps; mg.line_to(X(t), Y(level(t, tr) * v.v)); }
     mg.set_source_rgba(c[0], c[1], c[2], 1); mg.set_line_width(1.8); mg.stroke();
+    var JV = jointsFor(tr);
+    for (i = 0; i < JV.length; i++) {
+      var jx = X(JV[i].t), jy = Y(JV[i].l * v.v);
+      mg.ellipse(jx - 2.5, jy - 2.5, 5, 5); mg.set_source_rgba(0.09, 0.1, 0.12, 1); mg.fill();
+      mg.ellipse(jx - 1.8, jy - 1.8, 3.6, 3.6); mg.set_source_rgba(c[0], c[1], c[2], JV[i].t <= cur ? 1 : 0.4); mg.fill();
+    }
     var lv = level(cur, tr) * v.v;
     mg.move_to(X(cur), pt); mg.line_to(X(cur), pt + gh); mg.set_source_rgba(c[0], c[1], c[2], 0.3); mg.set_line_width(1); mg.stroke();
     mg.ellipse(X(cur) - 3, Y(lv) - 3, 6, 6); mg.set_source_rgba(c[0], c[1], c[2], 1); mg.fill();

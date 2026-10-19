@@ -99,6 +99,22 @@ function character(c) {
 }
 function regen() { if (!orig) { status("Load a sample first"); return; } st.seed++; st.restoring = false; startGen(); }
 
+// ---------- CLEAR: wipes the buffers, the garden and the state saved with the set ----------
+function clearall() {
+  if (genTask) genTask.cancel();
+  if (pollTask) pollTask.cancel();
+  if (expTask) expTask.cancel();
+  st.pending = false; st.restoring = false;
+  orig = null; origC = null; A = null; isMono = true;
+  done = []; order = []; wStore = [];
+  st.name = ""; st.srcPath = ""; st.seed = 1;          // the character choice stays
+  getBufs();
+  vb.send("clear"); sb.send("clear"); slb.send("clear");   // buffer~ "clear" zeroes every sample
+  outlet(0, "clearall");                                    // blob garden back to empty
+  outlet(3, 0);                                             // overwrite the state stored in the set (restore() ignores it)
+  status("Cleared - drop a sample to start");
+}
+
 // ---------- generation (RAM only), nearest-to-C3 first ----------
 function sendOrig() {
   var o = stats(orig);

@@ -10,6 +10,14 @@ var NAMES = ["pitch", "tone", "time", "grit", "mod", "texture"];
 var en = [], B = [], ripples = [], n;
 var orig = { bright: 0.5, rms: 0.3, flat: 0.3, bands: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], has: false };
 for (n = 0; n < 128; n++) { en[n] = 0; B[n] = null; }
+    
+function clearall() {
+  var i;
+  for (i = 0; i < 128; i++) { B[i] = null; en[i] = 0; }
+  ripples = []; held = -1; prog = 1; revealed = false;
+  orig = { bright: 0.5, rms: 0.3, flat: 0.3, bands: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], has: false };
+  mgraphics.redraw();
+}
 
 function clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
 function hsv(h, s, v) {
