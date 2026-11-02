@@ -1,0 +1,1364 @@
+hs(a, b, c, d) {
+  u = sin(a*12.9898 + b*78.233 + c*37.719 + d*4.581)*43758.5453;
+  return u - floor(u);
+}
+seedof(i) {
+  sd = 0;
+  if (i > 0.5) { sd = 2; }
+  if (i > 1.5) { sd = 4; }
+  if (i > 2.5) { sd = 25; }
+  if (i > 3.5) { sd = 31; }
+  if (i > 4.5) { sd = 39; }
+  if (i > 5.5) { sd = 51; }
+  if (i > 6.5) { sd = 59; }
+  if (i > 7.5) { sd = 60; }
+  if (i > 8.5) { sd = 72; }
+  if (i > 9.5) { sd = 82; }
+  if (i > 10.5) { sd = 97; }
+  if (i > 11.5) { sd = 106; }
+  if (i > 12.5) { sd = 114; }
+  return sd;
+}
+adsr(t, a, d, s) {
+  ev = 1;
+  if (t < a) {
+    ev = t/a;
+  } else if (t < a + d) {
+    ev = 1 - (1 - s)*((t - a)/d);
+  } else {
+    ev = s;
+  }
+  return ev;
+}
+pcell(v, k, q, cyc, dens, comp, rat, acc, mut) {
+  pp = q - 16*floor(q/16);
+  ev2 = pp - 2*floor(pp/2);
+  ev4 = pp - 4*floor(pp/4);
+  w = 0.12;
+  if (k == 0) {
+    w = 0.08;
+    if (ev2 < 0.5) { w = 0.2; }
+    if (ev4 < 0.5) { w = 0.5; }
+    if (pp == 10) { w = 0.45; }
+    if (pp == 8) { w = 0.85; }
+    if (pp == 0) { w = 1; }
+  }
+  if (k == 1) {
+    w = 0.1;
+    if (ev2 < 0.5) { w = 0.22; }
+    if (pp == 7 || pp == 15) { w = 0.38; }
+    if (pp == 4 || pp == 12) { w = 0.95; }
+  }
+  if (k == 2) {
+    w = 0.35;
+    if (ev2 < 0.5) { w = 0.6; }
+    if (ev4 > 1.5 && ev4 < 2.5) { w = 0.9; }
+  }
+  if (k == 3) {
+    w = 0.18;
+    if (pp == 3 || pp == 6 || pp == 9 || pp == 11 || pp == 14) { w = 0.65; }
+  }
+  if (k == 4) { w = 0.4; }
+  if (k == 5) {
+    w = 0.12;
+    if (pp == 7 || pp == 13 || pp == 15) { w = 0.5; }
+  }
+  fl = hs(v + 3.7, k, q, cyc + 11);
+  sh = 0;
+  if (fl < mut) { sh = cyc + 1; }
+  h0 = hs(v, k, q, 1 + sh*0.731);
+  h1 = hs(v, k, q, 2);
+  sty = hs(v, k, 200, 0)*0.8;
+  wc = w + (0.3 + 0.5*h1 - w)*max(comp, sty*0.7);
+  db = 0.55 + 0.9*hs(v, k, 201, 0);
+  if (hs(v, k, 202, 0) < 0.12) { db = 0.2; }
+  thr = clip(wc*2*dens*db + max(0, dens - 0.6)*1.5*db, 0, 1);
+  hit = 0;
+  if (h0 < thr) { hit = 1; }
+  n = 1;
+  vel = 1 - acc*0.8*hs(v, k, q, 5 + sh*0.317);
+  if (hit > 0.5) {
+    lb = 0.2;
+    if (k == 1) { lb = 0.7; }
+    if (k == 2) { lb = 1; }
+    if (k == 3) { lb = 0.5; }
+    if (k == 4) { lb = 0.8; }
+    if (k == 5) { lb = 0.9; }
+    if (hs(v, k, q, 4 + sh*0.531) < rat*lb) {
+      maxn = 2 + floor(rat*6.99);
+      n = 2 + floor(hs(v, k, q, 6 + sh*0.413)*(maxn - 1));
+      if (comp < 0.5 && n - 2*floor(n/2) > 0.5) { n = n + 1; }
+      n = min(n, 8);
+    }
+  }
+  val = 0;
+  if (hit > 0.5) { val = vel + 2*(n - 1); }
+  return val;
+}
+
+Param p_variation(0, min=0, max=14);
+Param p_mutate(0, min=0, max=1);
+Param p_density(0.55, min=0, max=1);
+Param p_complexity(0.35, min=0, max=1);
+Param p_ratchet(0.3, min=0, max=1);
+Param p_rdecay(0.4, min=0, max=1);
+Param p_accent(0.5, min=0, max=1);
+Param p_length(16, min=4, max=32);
+Param p_rate(1, min=0, max=3);
+Param p_m0(0, min=0, max=1);
+Param p_m1(0, min=0, max=1);
+Param p_m2(0, min=0, max=1);
+Param p_m3(0, min=0, max=1);
+Param p_m4(0, min=0, max=1);
+Param p_m5(0, min=0, max=1);
+Param p_lv0(0.8, min=0, max=1);
+Param p_lv1(0.8, min=0, max=1);
+Param p_lv2(0.8, min=0, max=1);
+Param p_lv3(0.8, min=0, max=1);
+Param p_lv4(0.8, min=0, max=1);
+Param p_lv5(0.8, min=0, max=1);
+Param p_tune(0, min=-24, max=24);
+Param p_reson(0.7, min=0, max=1);
+Param p_square(0.3, min=0, max=1);
+Param p_noisemix(0.4, min=0, max=1);
+Param p_drive(0.3, min=0, max=1);
+Param p_tone(0, min=-1, max=1);
+Param p_comb(0.35, min=0, max=1);
+Param p_combfb(0.6, min=0, max=1);
+Param p_combmod(0.5, min=0, max=1);
+Param p_level(-6, min=-36, max=6);
+Param p_attack(0, min=0, max=100);
+Param p_decay(60, min=1, max=800);
+Param p_sustain(0.6, min=0, max=1);
+Param p_release(30, min=0, max=800);
+Param p_gate(0.35, min=0.02, max=1);
+Param p_curve(0.2, min=0, max=1);
+
+Data cb0a(2048);
+Data cb0b(2048);
+Data cb1a(2048);
+Data cb1b(2048);
+Data cb2a(2048);
+Data cb2b(2048);
+Data cb3a(2048);
+Data cb3b(2048);
+Data cb4a(2048);
+Data cb4b(2048);
+Data cb5a(2048);
+Data cb5b(2048);
+Data cmL(2048);
+Data cmR(2048);
+
+History pph(0);
+History stillc(0);
+History bars(0);
+History pg(-1);
+History dsm(0);
+History sci(0);
+History sidx(0);
+History scode(0);
+History cmw(0);
+History cdl(200);
+History trigc(0);
+History hlpl(0);
+History hlpr(0);
+History dcxl(0);
+History dcxr(0);
+History dcyl(0);
+History dcyr(0);
+History v0_hit(0);
+History v0_n(1);
+History v0_dly(0);
+History v0_sm(0);
+History v0_vel(1);
+History v0_ls(-1);
+History v0_t(100000000);
+History v0_gl(16);
+History v0_vl(0);
+History v0_fz(100);
+History v0_hf(1);
+History v0_cp(64);
+History v0_pn(0);
+History v0_fl(0);
+History v0_cm(1);
+History v0_sq(0);
+History v0_bt(16);
+History v0_ch(0);
+History v0_un(0);
+History v0_nz(0);
+History v0a_cw(0);
+History v0a_ff(0);
+History v0a_shc(0);
+History v0a_shv(0);
+History v0b_cw(0);
+History v0b_ff(0);
+History v0b_shc(0);
+History v0b_shv(0);
+History v1_hit(0);
+History v1_n(1);
+History v1_dly(0);
+History v1_sm(0);
+History v1_vel(1);
+History v1_ls(-1);
+History v1_t(100000000);
+History v1_gl(16);
+History v1_vl(0);
+History v1_fz(100);
+History v1_hf(1);
+History v1_cp(64);
+History v1_pn(0);
+History v1_fl(0);
+History v1_cm(1);
+History v1_sq(0);
+History v1_bt(16);
+History v1_ch(0);
+History v1_un(0);
+History v1_nz(0);
+History v1a_cw(0);
+History v1a_ff(0);
+History v1a_shc(0);
+History v1a_shv(0);
+History v1b_cw(0);
+History v1b_ff(0);
+History v1b_shc(0);
+History v1b_shv(0);
+History v2_hit(0);
+History v2_n(1);
+History v2_dly(0);
+History v2_sm(0);
+History v2_vel(1);
+History v2_ls(-1);
+History v2_t(100000000);
+History v2_gl(16);
+History v2_vl(0);
+History v2_fz(100);
+History v2_hf(1);
+History v2_cp(64);
+History v2_pn(0);
+History v2_fl(0);
+History v2_cm(1);
+History v2_sq(0);
+History v2_bt(16);
+History v2_ch(0);
+History v2_un(0);
+History v2_nz(0);
+History v2a_cw(0);
+History v2a_ff(0);
+History v2a_shc(0);
+History v2a_shv(0);
+History v2b_cw(0);
+History v2b_ff(0);
+History v2b_shc(0);
+History v2b_shv(0);
+History v3_hit(0);
+History v3_n(1);
+History v3_dly(0);
+History v3_sm(0);
+History v3_vel(1);
+History v3_ls(-1);
+History v3_t(100000000);
+History v3_gl(16);
+History v3_vl(0);
+History v3_fz(100);
+History v3_hf(1);
+History v3_cp(64);
+History v3_pn(0);
+History v3_fl(0);
+History v3_cm(1);
+History v3_sq(0);
+History v3_bt(16);
+History v3_ch(0);
+History v3_un(0);
+History v3_nz(0);
+History v3a_cw(0);
+History v3a_ff(0);
+History v3a_shc(0);
+History v3a_shv(0);
+History v3b_cw(0);
+History v3b_ff(0);
+History v3b_shc(0);
+History v3b_shv(0);
+History v4_hit(0);
+History v4_n(1);
+History v4_dly(0);
+History v4_sm(0);
+History v4_vel(1);
+History v4_ls(-1);
+History v4_t(100000000);
+History v4_gl(16);
+History v4_vl(0);
+History v4_fz(100);
+History v4_hf(1);
+History v4_cp(64);
+History v4_pn(0);
+History v4_fl(0);
+History v4_cm(1);
+History v4_sq(0);
+History v4_bt(16);
+History v4_ch(0);
+History v4_un(0);
+History v4_nz(0);
+History v4a_cw(0);
+History v4a_ff(0);
+History v4a_shc(0);
+History v4a_shv(0);
+History v4b_cw(0);
+History v4b_ff(0);
+History v4b_shc(0);
+History v4b_shv(0);
+History v5_hit(0);
+History v5_n(1);
+History v5_dly(0);
+History v5_sm(0);
+History v5_vel(1);
+History v5_ls(-1);
+History v5_t(100000000);
+History v5_gl(16);
+History v5_vl(0);
+History v5_fz(100);
+History v5_hf(1);
+History v5_cp(64);
+History v5_pn(0);
+History v5_fl(0);
+History v5_cm(1);
+History v5_sq(0);
+History v5_bt(16);
+History v5_ch(0);
+History v5_un(0);
+History v5_nz(0);
+History v5a_cw(0);
+History v5a_ff(0);
+History v5a_shc(0);
+History v5a_shv(0);
+History v5b_cw(0);
+History v5b_ff(0);
+History v5b_shc(0);
+History v5b_shv(0);
+
+srate = samplerate;
+fdec = exp(-1/(0.07*srate));
+
+// ---- clock: host transport phase (phasor~ 1n @lock 1) ----
+ph = in1;
+pp0 = pph;
+pph = ph;
+dph = ph - pp0;
+wrapped = 0;
+if (dph < -0.5) { dph = dph + 1; wrapped = 1; }
+moving = 0;
+if (abs(ph - pp0) > 0) { moving = 1; }
+sc0 = stillc + 1;
+if (moving > 0.5) { sc0 = 0; }
+sc0 = min(sc0, 1000000);
+stillc = sc0;
+active = 1;
+if (sc0 >= 512) { active = 0; }
+barsn = bars;
+if (active < 0.5) { barsn = 0; }
+if (active > 0.5 && wrapped > 0.5) { barsn = bars + 1; }
+bars = barsn;
+dsn = dsm;
+if (active > 0.5 && dph > 0) {
+  if (dsm == 0) { dsn = dph; } else { dsn = dsm + (dph - dsm)*0.002; }
+}
+dsm = dsn;
+dphu = dsn;
+
+rt = floor(p_rate + 0.5);
+rr = 16;
+if (rt < 0.5) { rr = 8; }
+if (rt > 1.5 && rt < 2.5) { rr = 32; }
+if (rt > 2.5) { rr = 24; }
+lenst = clip(floor(p_length + 0.5), 4, 32);
+stlen = min(1/max(dphu*rr, 0.000001), srate*4);
+
+sps = floor(ph*rr);
+if (sps > rr - 1) { sps = rr - 1; }
+f = ph*rr - sps;
+g = barsn*rr + sps;
+stepchange = 0;
+if (active > 0.5 && g != pg) { stepchange = 1; }
+if (active > 0.5) { pg = g; } else { pg = -1; }
+
+vbase = floor(p_variation + 0.5);
+vidx = vbase;
+if (vbase > 13.5) {
+  vidx = floor(hs(7.7, floor(g/lenst), 401, 0)*14);
+  if (vidx > 13) { vidx = 13; }
+}
+veff = seedof(vidx);
+
+// ---- envelope time constants ----
+atks = p_attack*0.001*srate;
+dcys = max(p_decay*0.001*srate, 1);
+rts = p_release*0.001*srate;
+fbk = 0.5 + 0.5*p_reson;
+
+sumL = 0; sumR = 0; anyt = 0;
+
+
+// ---- lane 0 (KCK) ----
+cur_hit = v0_hit; cur_n = v0_n; cur_dly = v0_dly; cur_sm = v0_sm; cur_vel = v0_vel;
+if (stepchange > 0.5) {
+  pl = lenst;
+  rtk = floor(p_complexity*0 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 0, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m0 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 0, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v0_hit = nh; v0_n = nn; v0_dly = dd; v0_sm = sm; v0_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v0_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v0_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v0_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v0_gl; vlc = v0_vl; fzc = v0_fz; hfc = v0_hf; cpc = v0_cp; pnc = v0_pn;
+cmc = v0_cm; sqc = v0_sq; btc = v0_bt; chc = v0_ch; unc = v0_un; nzc = v0_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*1.0*(0.4 + 1.2*hs(veff, 0, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(52.0*pow(2, (hs(veff, 0, 100, 0) - 0.5)*0.9*2 + floor(hs(veff, 0, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 0, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 0.0*r1);
+  r8 = hs(veff, 0, 108, 8);
+  btc = max(16 - r8*r8*12 - 0, 3);
+  r9 = hs(veff, 0, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 0, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(1.0 + (hs(veff, 0, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(0.55*(0.3 + 1.4*hs(veff, 0, 107, 7)), 0, 1);
+  nzc = clip(0.06 + (hs(veff, 0, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 0, 102, 2))), 8);
+  pnc = clip(0.0 + (hs(veff, 0, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v0_t = tt; v0_gl = glc; v0_vl = vlc; v0_fz = fzc; v0_hf = hfc; v0_cp = cpc; v0_pn = pnc;
+v0_cm = cmc; v0_sq = sqc; v0_bt = btc; v0_ch = chc; v0_un = unc; v0_nz = nzc;
+
+flv = v0_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v0_fl = flv;
+fl0 = flv;
+
+dcur = fzc;
+yl0 = 0; yr0 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 0, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v0a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb0a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb0a, yc, v0a_cw);
+  nwi = v0a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v0a_cw = nwi;
+  ffp = v0a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v0a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v0a_shc + 1;
+  shv = v0a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v0a_shc = shc;
+  v0a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*1.0;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv0*1.25;
+  sumL = sumL + yoa*gnl*lvk;
+  sumR = sumR + yoa*gnr*lvk;
+  yl0 = yoa; yr0 = yoa;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb0a, 0, v0a_cw);
+  poke(cb0b, 0, v0b_cw);
+}
+
+
+// ---- lane 1 (SNR) ----
+cur_hit = v1_hit; cur_n = v1_n; cur_dly = v1_dly; cur_sm = v1_sm; cur_vel = v1_vel;
+if (stepchange > 0.5) {
+  pl = max(lenst - floor(p_complexity*1 + 0.0001), 2);
+  rtk = floor(p_complexity*1 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 1, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m1 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 1, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v1_hit = nh; v1_n = nn; v1_dly = dd; v1_sm = sm; v1_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v1_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v1_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v1_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v1_gl; vlc = v1_vl; fzc = v1_fz; hfc = v1_hf; cpc = v1_cp; pnc = v1_pn;
+cmc = v1_cm; sqc = v1_sq; btc = v1_bt; chc = v1_ch; unc = v1_un; nzc = v1_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*0.8*(0.4 + 1.2*hs(veff, 1, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(210.0*pow(2, (hs(veff, 1, 100, 0) - 0.5)*0.8*2 + floor(hs(veff, 1, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 1, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 3.0*r1);
+  r8 = hs(veff, 1, 108, 8);
+  btc = max(16 - r8*r8*12 - 0, 3);
+  r9 = hs(veff, 1, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 1, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(0.4 + (hs(veff, 1, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(0.1*(0.3 + 1.4*hs(veff, 1, 107, 7)), 0, 1);
+  nzc = clip(0.95 + (hs(veff, 1, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 1, 102, 2))), 8);
+  pnc = clip(-0.2 + (hs(veff, 1, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v1_t = tt; v1_gl = glc; v1_vl = vlc; v1_fz = fzc; v1_hf = hfc; v1_cp = cpc; v1_pn = pnc;
+v1_cm = cmc; v1_sq = sqc; v1_bt = btc; v1_ch = chc; v1_un = unc; v1_nz = nzc;
+
+flv = v1_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v1_fl = flv;
+fl1 = flv;
+
+dcur = fzc;
+yl1 = 0; yr1 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 1, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v1a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb1a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb1a, yc, v1a_cw);
+  nwi = v1a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v1a_cw = nwi;
+  ffp = v1a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v1a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v1a_shc + 1;
+  shv = v1a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v1a_shc = shc;
+  v1a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*0.8;
+
+
+  // chain b
+  exc = imp + noise()*nzw*0.9;
+  ri = v1b_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb1b, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb1b, yc, v1b_cw);
+  nwi = v1b_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v1b_cw = nwi;
+  ffp = v1b_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v1b_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v1b_shc + 1;
+  shv = v1b_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v1b_shc = shc;
+  v1b_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yob = yy*envv*cg*vlc*0.8;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv1*1.25;
+  sumL = sumL + yoa*gnl*lvk*1.15;
+  sumR = sumR + yob*gnr*lvk*1.15;
+  yl1 = yoa; yr1 = yob;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb1a, 0, v1a_cw);
+  poke(cb1b, 0, v1b_cw);
+}
+
+
+// ---- lane 2 (HAT) ----
+cur_hit = v2_hit; cur_n = v2_n; cur_dly = v2_dly; cur_sm = v2_sm; cur_vel = v2_vel;
+if (stepchange > 0.5) {
+  pl = max(lenst - floor(p_complexity*2 + 0.0001), 2);
+  rtk = floor(p_complexity*3 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 2, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m2 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 2, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v2_hit = nh; v2_n = nn; v2_dly = dd; v2_sm = sm; v2_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v2_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v2_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v2_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v2_gl; vlc = v2_vl; fzc = v2_fz; hfc = v2_hf; cpc = v2_cp; pnc = v2_pn;
+cmc = v2_cm; sqc = v2_sq; btc = v2_bt; chc = v2_ch; unc = v2_un; nzc = v2_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*0.22*(0.4 + 1.2*hs(veff, 2, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(7600.0*pow(2, (hs(veff, 2, 100, 0) - 0.5)*0.5*2 + floor(hs(veff, 2, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 2, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 0.0*r1);
+  r8 = hs(veff, 2, 108, 8);
+  btc = max(16 - r8*r8*12 - 0, 3);
+  r9 = hs(veff, 2, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 2, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(0.7 + (hs(veff, 2, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(0.0*(0.3 + 1.4*hs(veff, 2, 107, 7)), 0, 1);
+  nzc = clip(0.3 + (hs(veff, 2, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 2, 102, 2))), 8);
+  pnc = clip(0.35 + (hs(veff, 2, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v2_t = tt; v2_gl = glc; v2_vl = vlc; v2_fz = fzc; v2_hf = hfc; v2_cp = cpc; v2_pn = pnc;
+v2_cm = cmc; v2_sq = sqc; v2_bt = btc; v2_ch = chc; v2_un = unc; v2_nz = nzc;
+
+flv = v2_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v2_fl = flv;
+fl2 = flv;
+
+dcur = fzc;
+yl2 = 0; yr2 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 2, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v2a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb2a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb2a, yc, v2a_cw);
+  nwi = v2a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v2a_cw = nwi;
+  ffp = v2a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v2a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v2a_shc + 1;
+  shv = v2a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v2a_shc = shc;
+  v2a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*0.55;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv2*1.25;
+  sumL = sumL + yoa*gnl*lvk;
+  sumR = sumR + yoa*gnr*lvk;
+  yl2 = yoa; yr2 = yoa;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb2a, 0, v2a_cw);
+  poke(cb2b, 0, v2b_cw);
+}
+
+
+// ---- lane 3 (PLS) ----
+cur_hit = v3_hit; cur_n = v3_n; cur_dly = v3_dly; cur_sm = v3_sm; cur_vel = v3_vel;
+if (stepchange > 0.5) {
+  pl = max(lenst - floor(p_complexity*3 + 0.0001), 2);
+  rtk = floor(p_complexity*2 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 3, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m3 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 3, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+  sp = floor(hs(veff, 3, qq, 20)*8);
+  if (sp > 0.5) { sm = 3; }
+  if (sp > 1.5) { sm = 5; }
+  if (sp > 2.5) { sm = 7; }
+  if (sp > 3.5) { sm = 10; }
+  if (sp > 4.5) { sm = 12; }
+  if (sp > 5.5) { sm = -5; }
+  if (sp > 6.5) { sm = -2; }
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v3_hit = nh; v3_n = nn; v3_dly = dd; v3_sm = sm; v3_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v3_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v3_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v3_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v3_gl; vlc = v3_vl; fzc = v3_fz; hfc = v3_hf; cpc = v3_cp; pnc = v3_pn;
+cmc = v3_cm; sqc = v3_sq; btc = v3_bt; chc = v3_ch; unc = v3_un; nzc = v3_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*1.1*(0.4 + 1.2*hs(veff, 3, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(262.0*pow(2, (hs(veff, 3, 100, 0) - 0.5)*0.0*2 + floor(hs(veff, 3, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 3, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 0.0*r1);
+  r8 = hs(veff, 3, 108, 8);
+  btc = max(16 - r8*r8*12 - 0, 3);
+  r9 = hs(veff, 3, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 3, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(1.0 + (hs(veff, 3, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(1.0*(0.3 + 1.4*hs(veff, 3, 107, 7)), 0, 1);
+  nzc = clip(0.0 + (hs(veff, 3, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 3, 102, 2))), 8);
+  pnc = clip(-0.45 + (hs(veff, 3, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v3_t = tt; v3_gl = glc; v3_vl = vlc; v3_fz = fzc; v3_hf = hfc; v3_cp = cpc; v3_pn = pnc;
+v3_cm = cmc; v3_sq = sqc; v3_bt = btc; v3_ch = chc; v3_un = unc; v3_nz = nzc;
+
+flv = v3_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v3_fl = flv;
+fl3 = flv;
+
+dcur = fzc;
+yl3 = 0; yr3 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 3, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v3a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb3a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb3a, yc, v3a_cw);
+  nwi = v3a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v3a_cw = nwi;
+  ffp = v3a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v3a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v3a_shc + 1;
+  shv = v3a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v3a_shc = shc;
+  v3a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*0.55;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv3*1.25;
+  sumL = sumL + yoa*gnl*lvk;
+  sumR = sumR + yoa*gnr*lvk;
+  yl3 = yoa; yr3 = yoa;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb3a, 0, v3a_cw);
+  poke(cb3b, 0, v3b_cw);
+}
+
+
+// ---- lane 4 (GLT) ----
+cur_hit = v4_hit; cur_n = v4_n; cur_dly = v4_dly; cur_sm = v4_sm; cur_vel = v4_vel;
+if (stepchange > 0.5) {
+  pl = max(lenst - floor(p_complexity*5 + 0.0001), 2);
+  rtk = floor(p_complexity*4 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 4, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m4 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 4, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v4_hit = nh; v4_n = nn; v4_dly = dd; v4_sm = sm; v4_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v4_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v4_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v4_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v4_gl; vlc = v4_vl; fzc = v4_fz; hfc = v4_hf; cpc = v4_cp; pnc = v4_pn;
+cmc = v4_cm; sqc = v4_sq; btc = v4_bt; chc = v4_ch; unc = v4_un; nzc = v4_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*0.9*(0.4 + 1.2*hs(veff, 4, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(1500.0*pow(2, (hs(veff, 4, 100, 0) - 0.5)*1.5*2 + floor(hs(veff, 4, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 4, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 6.0*r1);
+  r8 = hs(veff, 4, 108, 8);
+  btc = max(16 - r8*r8*12 - 2, 3);
+  r9 = hs(veff, 4, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 4, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(0.15 + (hs(veff, 4, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(0.2*(0.3 + 1.4*hs(veff, 4, 107, 7)), 0, 1);
+  nzc = clip(1.0 + (hs(veff, 4, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 4, 102, 2))), 8);
+  pnc = clip(0.5 + (hs(veff, 4, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v4_t = tt; v4_gl = glc; v4_vl = vlc; v4_fz = fzc; v4_hf = hfc; v4_cp = cpc; v4_pn = pnc;
+v4_cm = cmc; v4_sq = sqc; v4_bt = btc; v4_ch = chc; v4_un = unc; v4_nz = nzc;
+
+flv = v4_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v4_fl = flv;
+fl4 = flv;
+
+dcur = fzc;
+yl4 = 0; yr4 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 4, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v4a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb4a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb4a, yc, v4a_cw);
+  nwi = v4a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v4a_cw = nwi;
+  ffp = v4a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v4a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v4a_shc + 1;
+  shv = v4a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v4a_shc = shc;
+  v4a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*0.6;
+
+
+  // chain b
+  exc = imp + noise()*nzw*0.9;
+  ri = v4b_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb4b, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb4b, yc, v4b_cw);
+  nwi = v4b_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v4b_cw = nwi;
+  ffp = v4b_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v4b_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v4b_shc + 1;
+  shv = v4b_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v4b_shc = shc;
+  v4b_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yob = yy*envv*cg*vlc*0.6;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv4*1.25;
+  sumL = sumL + yoa*gnl*lvk*1.15;
+  sumR = sumR + yob*gnr*lvk*1.15;
+  yl4 = yoa; yr4 = yob;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb4a, 0, v4a_cw);
+  poke(cb4b, 0, v4b_cw);
+}
+
+
+// ---- lane 5 (ZAP) ----
+cur_hit = v5_hit; cur_n = v5_n; cur_dly = v5_dly; cur_sm = v5_sm; cur_vel = v5_vel;
+if (stepchange > 0.5) {
+  pl = max(lenst - floor(p_complexity*7 + 0.0001), 2);
+  rtk = floor(p_complexity*6 + 0.0001);
+  gq = g + rtk;
+  qq = gq - pl*floor(gq/pl);
+  cc = floor(gq/pl);
+  val = pcell(veff, 5, qq, cc, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  nh = 0;
+  if (val > 0 && p_m5 < 0.5) { nh = 1; }
+  nn = floor(val/2) + 1;
+  vv = val - 2*(nn - 1);
+  dd = hs(veff, 5, qq, 9)*p_complexity*0.1;
+  dd = min(dd, 0.45);
+  sm = 0;
+
+  cur_hit = nh; cur_n = nn; cur_dly = dd; cur_sm = sm; cur_vel = vv;
+  v5_hit = nh; v5_n = nn; v5_dly = dd; v5_sm = sm; v5_vel = vv;
+}
+xx = f - cur_dly;
+subi = -1;
+if (cur_hit > 0.5 && xx >= 0) {
+  subi = floor(xx/(1 - cur_dly)*cur_n);
+  if (subi > cur_n - 1) { subi = cur_n - 1; }
+}
+ls = v5_ls;
+if (stepchange > 0.5) { ls = -1; }
+trig = 0;
+if (subi >= 0 && subi != ls && active > 0.5) { trig = 1; }
+if (subi >= 0) { ls = subi; }
+v5_ls = ls;
+anyt = max(anyt, trig);
+
+tprev = v5_t;
+tt = tprev + 1;
+if (trig > 0.5) { tt = 0; }
+glc = v5_gl; vlc = v5_vl; fzc = v5_fz; hfc = v5_hf; cpc = v5_cp; pnc = v5_pn;
+cmc = v5_cm; sqc = v5_sq; btc = v5_bt; chc = v5_ch; unc = v5_un; nzc = v5_nz;
+if (trig > 0.5) {
+  sublen = stlen*(1 - cur_dly)/cur_n;
+  glc = max(p_gate*sublen*1.0*(0.4 + 1.2*hs(veff, 5, 101, 4)), 16);
+  vlc = cur_vel*(1 - p_rdecay*0.85*subi/max(cur_n, 1));
+  fzc = floor(srate/(3500.0*pow(2, (hs(veff, 5, 100, 0) - 0.5)*0.6*2 + floor(hs(veff, 5, 106, 6)*3) - 1)*pow(2, (p_tune + cur_sm)/12)) + 0.5);
+  fzc = clip(fzc, 2, 2000);
+  r1 = hs(veff, 5, 101, 1);
+  hfc = 1 + floor(r1*r1*r1*40 + 1.0*r1);
+  r8 = hs(veff, 5, 108, 8);
+  btc = max(16 - r8*r8*12 - 0, 3);
+  r9 = hs(veff, 5, 109, 9);
+  chc = 0;
+  if (r9 > 0.55) { chc = (r9 - 0.55)*1.8; }
+  r10 = hs(veff, 5, 110, 10);
+  unc = 0;
+  if (r10 > 0.6) { unc = (r10 - 0.6)*2.5; }
+  cmc = clip(1.0 + (hs(veff, 5, 105, 5) - 0.5), 0.1, 1);
+  sqc = clip(0.3*(0.3 + 1.4*hs(veff, 5, 107, 7)), 0, 1);
+  nzc = clip(0.05 + (hs(veff, 5, 104, 5) - 0.5)*1.1, 0, 1);
+  cpc = max(floor(srate*(0.0012 + 0.012*hs(veff, 5, 102, 2))), 8);
+  pnc = clip(0.0 + (hs(veff, 5, 103, 3) - 0.5)*1.4, -1, 1);
+}
+v5_t = tt; v5_gl = glc; v5_vl = vlc; v5_fz = fzc; v5_hf = hfc; v5_cp = cpc; v5_pn = pnc;
+v5_cm = cmc; v5_sq = sqc; v5_bt = btc; v5_ch = chc; v5_un = unc; v5_nz = nzc;
+
+flv = v5_fl*fdec;
+if (trig > 0.5) { flv = max(flv, 0.3 + 0.7*vlc); }
+v5_fl = flv;
+fl5 = flv;
+
+dcur = clip(floor(fzc*(1 + (hs(veff, 5, 111, 11)*4 - 0.6)*min(tt/max(glc, 1), 1))), 2, 2000);
+yl5 = 0; yr5 = 0;
+if (tt < glc + rts + 2) {
+  imp = 0;
+  if (tt < 0.5) { imp = 1; }
+  nzw = clip(nzc*(0.15 + 1.7*p_noisemix), 0, 1);
+  envv = adsr(tt, atks, dcys, p_sustain);
+  if (tt >= glc) {
+    env0 = adsr(glc, atks, dcys, p_sustain);
+    envv = env0*max(1 - (tt - glc)/max(rts, 1), 0);
+  }
+  envv = pow(max(envv, 0), 1 + p_curve*3);
+  cg = 1;
+  if (chc > 0.01) {
+    sg = floor(tt/cpc);
+    if (hs(sg*0.731, 5, vlc*7.1, veff*0.13) < chc*0.75) { cg = 0; }
+  }
+
+  // chain a
+  exc = imp + noise()*nzw*0.9;
+  ri = v5a_cw - dcur;
+  if (ri < 0) { ri = ri + 2048; }
+  cprev = peek(cb5a, ri);
+  yc = clip(exc + fbk*cprev, -1, 1);
+  poke(cb5a, yc, v5a_cw);
+  nwi = v5a_cw + 1;
+  if (nwi >= 2048) { nwi = 0; }
+  v5a_cw = nwi;
+  ffp = v5a_ff;
+  ffn = ffp;
+  if (abs(yc) > 0.5) { ffn = 1 - ffp; }
+  v5a_ff = ffn;
+  yy = exc + cmc*(yc - exc);
+  yy = yy + p_square*sqc*((ffn*2 - 1)*0.9 - yy);
+  shc = v5a_shc + 1;
+  shv = v5a_shv;
+  if (shc >= hfc) { shc = 0; shv = yy; }
+  v5a_shc = shc;
+  v5a_shv = shv;
+  yy = shv;
+  lvq = pow(2, btc)*0.5;
+  yy = floor(yy*lvq + 0.5)/lvq;
+  gg = 1 + p_drive*12;
+  ya = clip(yy*gg, -1, 1);
+  xf = yy*gg + 1;
+  xf = xf - 4*floor(xf/4);
+  yb = 1 - abs(xf - 2);
+  yy = ya + (yb - ya)*p_drive*p_drive;
+  yy = yy + unc*((yy*0.5 + 0.5) - yy);
+  yoa = yy*envv*cg*vlc*0.6;
+
+  gnl = sqrt(0.5*(1 - pnc));
+  gnr = sqrt(0.5*(1 + pnc));
+  lvk = p_lv5*1.25;
+  sumL = sumL + yoa*gnl*lvk;
+  sumR = sumR + yoa*gnr*lvk;
+  yl5 = yoa; yr5 = yoa;
+}
+if (tt >= glc + rts + 2) {
+  poke(cb5a, 0, v5a_cw);
+  poke(cb5b, 0, v5b_cw);
+}
+
+
+// ---- pattern scanner: streams every cell (lane*32+step) for the visuals ----
+scd = scode;
+scn = sci + 1;
+sdx = sidx;
+if (scn >= 128) {
+  scn = 0;
+  sdx = sdx + 1;
+  if (sdx >= 192) { sdx = 0; }
+  skk = floor(sdx/32);
+  spp = sdx - skk*32;
+  sploff = 0;
+  sprot = 0;
+  if (skk == 1) { sploff = 1; sprot = 1; }
+  if (skk == 2) { sploff = 2; sprot = 3; }
+  if (skk == 3) { sploff = 3; sprot = 2; }
+  if (skk == 4) { sploff = 5; sprot = 4; }
+  if (skk == 5) { sploff = 7; sprot = 6; }
+  spl = max(lenst - floor(p_complexity*sploff + 0.0001), 2);
+  svl = 0;
+  if (spp < spl) {
+    scy = floor((g + floor(p_complexity*sprot + 0.0001))/spl);
+    svl = pcell(veff, skk, spp, scy, p_density, p_complexity, p_ratchet, p_accent, p_mutate);
+  }
+  scd = sdx*2000 + floor(svl*100 + 0.5);
+}
+scode = scd;
+sci = scn;
+sidx = sdx;
+
+
+// ---- glitch comb: feedback comb whose length jumps on every hit ----
+cdn = cdl;
+tcn = trigc;
+if (anyt > 0.5) {
+  tcn = trigc + 1;
+  cfb = 70*pow(2, hs(veff, 0, 301, 0)*5);
+  cjmp = hs(veff, tcn, 303, 0);
+  cfc = cfb*pow(2, p_combmod*(cjmp*5 - 1.5));
+  cdn = clip(floor(srate/cfc + 0.5), 3, 1500);
+}
+cri = cmw - cdn;
+if (cri < 0) { cri = cri + 2048; }
+cri2 = cmw - (cdn + 1 + 6);
+if (cri2 < 0) { cri2 = cri2 + 2048; }
+cl = peek(cmL, cri);
+cr = peek(cmR, cri2);
+fbc = p_combfb*0.96;
+wl = clip(sumL + fbc*cl, -2, 2);
+wr = clip(sumR + fbc*cr, -2, 2);
+poke(cmL, wl, cmw);
+poke(cmR, wr, cmw);
+cwn = cmw + 1;
+if (cwn >= 2048) { cwn = 0; }
+cmw = cwn;
+cdl = cdn;
+trigc = tcn;
+sumL = sumL + p_comb*(wl - sumL);
+sumR = sumR + p_comb*(wr - sumR);
+
+// ---- master: level, tone, DC blocker, safety clip ----
+lvl = pow(10, p_level/20);
+mL = clip(sumL*lvl, -1.5, 1.5);
+mR = clip(sumR*lvl, -1.5, 1.5);
+tn = p_tone;
+oL = mL; oR = mR;
+lpL = hlpl; lpR = hlpr;
+if (tn < -0.01) {
+  fcl = 18000*pow(0.04, -tn);
+  cof = exp(-6.2831853*fcl/srate);
+  lpL = mL + cof*(hlpl - mL);
+  lpR = mR + cof*(hlpr - mR);
+  oL = lpL; oR = lpR;
+}
+if (tn > 0.01) {
+  fch = 30*pow(100, tn);
+  cof2 = exp(-6.2831853*fch/srate);
+  lpL = mL + cof2*(hlpl - mL);
+  lpR = mR + cof2*(hlpr - mR);
+  oL = mL - lpL; oR = mR - lpR;
+}
+hlpl = lpL; hlpr = lpR;
+dyl = oL - dcxl + 0.9993*dcyl;
+dyr = oR - dcxr + 0.9993*dcyr;
+dcxl = oL; dcxr = oR;
+dcyl = dyl; dcyr = dyr;
+out1 = clip(dyl, -1, 1);
+out2 = clip(dyr, -1, 1);
+out3 = (g - 4096*floor(g/4096)) + f;
+out4 = vidx;
+out5 = scd;
+out6 = fl0; out7 = fl1; out8 = fl2; out9 = fl3; out10 = fl4; out11 = fl5;
+
